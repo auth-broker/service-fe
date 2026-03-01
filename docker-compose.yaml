@@ -3,15 +3,14 @@ services:
     build:
       context: .
 
+    environment:
+      BFF_SERVICE_BASE_URL: "${BFF_SERVICE_BASE_URL:-http://localhost:9999}"
+
     volumes:
       - ./src:/package/src
       - ./tests:/package/tests
-      - ./alembic:/package/alembic
-      - ./alembic.ini:/package/alembic.ini:ro
-      - data:/package/data
 
     ports:
-      - "8000:80"
+      - "9998:8501"
 
-volumes:
-  data:
+    restart: unless-stopped

@@ -1,6 +1,6 @@
 <div align="center">
 
-# Python Package Template
+# Auth Broker Frontend Service
 
 The template repository for creating python packages, shared across auth-broker.
 

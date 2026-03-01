@@ -55,15 +55,16 @@
       }
     },
     {
-      "name": "Run FastAPI (app:main)",
+      "name": "Run Streamlit (Auth Broker UI)",
       "type": "debugpy",
       "request": "launch",
-      "module": "uvicorn",
+      "module": "streamlit",
       "args": [
-        "ab_service.template.main:app",
-        "--host", "127.0.0.1",
-        "--port", "8000",
-        "--reload"
+        "run",
+        "src/ab_service/fe/main.py",
+        "--server.address=127.0.0.1",
+        "--server.port=9998",
+        "--server.headless=true"
       ],
       "justMyCode": false,
       "console": "integratedTerminal",
