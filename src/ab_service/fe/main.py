@@ -2,13 +2,15 @@
 
 from dataclasses import dataclass
 from typing import Annotated
-from urllib.parse import urljoin
+from yarl import URL
 
 import streamlit as st
 from ab_core.dependency import Depends, inject, sentinel
 from streamlit_autorefresh import st_autorefresh
 
 from ab_service.fe.dependencies import AppSettings, BFFClient, get_app_settings, get_bff_client
+from ab_service.fe import components as ui
+from ab_service.fe.js import get_browser_location, fetch_with_credentials
 
 
 @dataclass(frozen=True)
@@ -23,16 +25,29 @@ class NavLinks:
 def build_nav_links(
     bff_client: Annotated[BFFClient, Depends(get_bff_client)] = sentinel(),
 ) -> NavLinks:
-    login_url = urljoin(bff_client.base_url, "/auth/login")
-    logout_url = urljoin(bff_client.base_url, "/auth/logout")
-    refresh_url = urljoin(bff_client.base_url, "/auth/refresh")
-    me_url = urljoin(bff_client.base_url, "/auth/me")
+    page_location = get_browser_location()
+
+    login_url = (URL(bff_client.base_url) / "auth" / "login")
+    logout_url = (URL(bff_client.base_url) / "auth" / "logout")
+    refresh_url = (URL(bff_client.base_url) / "auth" / "refresh")
+    me_url = (URL(bff_client.base_url) / "auth" / "me")
+
+    if page_location is not None:
+        login_url = login_url.with_query(
+            return_to=page_location.get("href") if page_location else None
+        )
+        logout_url = logout_url.with_query(
+            return_to=page_location.get("href") if page_location else None
+        )
+        refresh_url = refresh_url.with_query(
+            return_to=page_location.get("href") if page_location else None
+        )
 
     return NavLinks(
-        login_url=login_url,
-        logout_url=logout_url,
-        refresh_url=refresh_url,
-        me_url=me_url,
+        login_url=str(login_url),
+        logout_url=str(logout_url),
+        refresh_url=str(refresh_url),
+        me_url=str(me_url),
     )
 
 
@@ -45,7 +60,6 @@ def render_header() -> None:
         "A low-level platform for service-to-service logins powered by captured user OAuth2 sessions "
         "(Playwright / Browserless / CDP), with refresh & retrieval for downstream services."
     )
-
 
 @inject
 def render_sidebar(
@@ -65,19 +79,29 @@ def render_sidebar(
 
         st.divider()
         st.subheader("Auth")
-
-        # These MUST be browser navigations (not fetch calls), because the BFF performs redirects
-        # and sets cookies.
-        st.link_button("Log in", links.login_url, use_container_width=True)
-        st.link_button("Refresh session", links.refresh_url, use_container_width=True)
-        st.link_button("Log out", links.logout_url, use_container_width=True)
+        ui.render_link(links.login_url, link_text="Log in")
+        ui.render_link(links.refresh_url, link_text="Refresh session")
+        ui.render_link(links.logout_url, link_text="Log out")
 
         st.divider()
         st.subheader("Diagnostics")
-        st.link_button("Open /auth/me (new tab)", links.me_url, use_container_width=True)
+
+        if st.button("Fetch /auth/me (with cookies)", use_container_width=True):
+            st.session_state["do_fetch_me"] = True
 
         st.divider()
         st.caption("Tip: if you’re testing locally, make sure cookie domains align with your UI/BFF hosts.")
+
+    # Run the fetch outside the sidebar container if you prefer, but it can live here too.
+    if st.session_state.get("do_fetch_me"):
+        from ab_service.fe.js import fetch_with_credentials
+
+        result = fetch_with_credentials(links.me_url, component_key="FETCH_ME")
+
+        # First run often None; keep the flag set so next rerun receives the value.
+        if result is not None:
+            st.session_state["do_fetch_me"] = False
+            st.session_state["me_result"] = result
 
     return page
 
